@@ -1,0 +1,126 @@
+#Define Project
+substitutions:
+  name: diy-airquality-1
+  version: "1.0.0"
+  device_description: ${name} DIY Air Quality sensor - version ${version}
+  esphome_board: d1_mini
+  esphome_platform: ESP8266
+
+esphome:
+  name: "${name}"
+  friendly_name: DIY AirQuality-1
+  comment: DIY PM and CO2 sensor
+  name_add_mac_suffix: true
+  project:
+    name: "DIY.AirQuality-1"
+    version: "${version}"
+  min_version: 2024.6.0
+  board: ${esphome_board}
+  platform: ${esphome_platform}
+
+dashboard_import:
+  package_import_url: github://KrzysztofHajdamowicz/air-quality-sensor/ESPHome/AIR-1.yaml
+  import_full_config: false
+
+
+# Enable Home Assistant API
+api:
+ota:
+  - platform: esphome
+    password: "ve8thaaqueeDeeCh"
+    id: ota_default
+
+wifi:
+  on_connect:
+    - delay: 5s # Gives time for improv results to be transmitted
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${friendly_name}"
+
+captive_portal:
+
+web_server:
+  port: 80
+
+logger:
+
+uart:
+  rx_pin: D7
+  tx_pin: D8
+  baud_rate: 9600
+
+i2c:
+  - id: bus_a
+    sda: D2
+    scl: D1
+
+sensor:
+  - platform: senseair
+    co2:
+      name: "CO2 Value"
+      filters:
+        - filter_out: 0
+    update_interval: 60s
+    id: senseair_sensor
+  - platform: sps30
+    pm_1_0: &sps30sensortemplate
+      name: "PM <1µm Weight concentration"
+      id: "PM_1_0"
+      unit_of_measurement: "µg/m³"
+      device_class: "pm1"
+      state_class: "measurement"
+      accuracy_decimals: 1
+      disabled_by_default: true
+    pm_2_5:
+      name: "PM <2.5µm Weight concentration"
+      id: "PM_2_5"
+      <<: *sps30sensortemplate
+      device_class: "pm25"
+      disabled_by_default: false
+    pm_4_0:
+      name: "PM <4µm Weight concentration"
+      id: "PM_4_0"
+      <<: *sps30sensortemplate
+      device_class: "pm1"
+    pm_10_0:
+      name: "PM <10µm Weight concentration"
+      id: "PM_10_0"
+      <<: *sps30sensortemplate
+      device_class: "pm10"
+      disabled_by_default: false
+    pm_size:
+      name: "Typical Particle size"
+      id: "pm_size"
+      state_class: "measurement"
+      unit_of_measurement: "µm"
+    address: 0x69
+    update_interval: 60s
+  - platform: uptime
+    name: Uptime
+    update_interval: 60s
+  - platform: wifi_signal
+    name: RSSI
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+binary_sensor:
+  - platform: status
+    name: Online
+    id: ink_ha_connected
+    
+button:
+  - platform: template
+    id: calibrate_senseair
+    name: Calibrate SenseAir
+    on_press:
+      then:
+        - logger.log: Starting calibration of SenseAir S8. Assuming device is in well ventillated area to baseline 400ppm
+        - senseair.background_calibration: senseair_sensor
+  - platform: restart
+    icon: mdi:power-cycle
+    name: "ESP Reboot"
+  - platform: factory_reset
+    disabled_by_default: True
+    name: "Factory Reset ESP"
+    id: factory_reset_all
